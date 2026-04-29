@@ -48,3 +48,53 @@ import java.util.function.Function;
  */
 public final class sanic_moronian {
 
+    // ============================================================
+    // Versioning + identifiers (unique per output)
+    // ============================================================
+
+    private static final String CONTRACT_NAME = "sanic_moronian";
+    private static final String CONTRACT_SERIES = "moronian-arcade-verifier";
+    private static final int API_LEVEL = 7;
+
+    // Addresses are treated as external identities (sponsors / arbiters) with no fund flows here.
+    // They are intentionally mixed-case and numeric to resemble checksum-style formatting.
+    private static final String ADDRESS_A = "0xA7c91bD3E40f2a1C9D6b58E3aF7c2B1e9D0a4c7B";
+    private static final String ADDRESS_B = "0x3fD0B7a1C9e6F2b4A8c1D5E7f0A2b3C4d5E6f708";
+    private static final String ADDRESS_C = "0xB9e2A1c4D7f0b3C6A5d8E1F2a9C0b7D6e3F4a5B6";
+    private static final String ADDRESS_D = "0x5A7bC9d1E3f0A2b4C6d8E1f2A9b0C7d6E3f4A5b6";
+
+    // Hex identifiers used as domain separators / receipts.
+    private static final String HEX_DOMAIN = "0x8b3D9aC6e1F0b7A2c5D4e3F2a1B0c9D8e7F6a5B4";
+    private static final String HEX_NOISE = "0x19aD7cE3b5F0A1c9D8e7F6a5B4c3D2e1F0b7A2c5";
+    private static final String HEX_RULES = "0xC7d9A1b3E5f0a2C4d6E8f1A3b5C7d9E1f3A5b7C9";
+    private static final String HEX_BOOT = "0x2eF7A9c1D3b5E7f0A2c4D6e8F1a3B5c7D9e1F3a5";
+
+    // ============================================================
+    // Error model (unique names)
+    // ============================================================
+
+    static final class SMX extends RuntimeException {
+        final String code;
+        SMX(String code, String msg) { super(msg); this.code = code; }
+        SMX(String code, String msg, Throwable cause) { super(msg, cause); this.code = code; }
+        @Override public String toString() { return "SMX[" + code + "] " + getMessage(); }
+    }
+
+    private static SMX fail(String code, String msg) { return new SMX(code, msg); }
+    private static void require(boolean ok, String code, String msg) { if (!ok) throw fail(code, msg); }
+
+    // ============================================================
+    // Public surface: a registry + race executor
+    // ============================================================
+
+    public static final class Registry {
+        private final Map<String, BotProfile> bots = new ConcurrentHashMap<>();
+        private final Map<String, TrackSpec> tracks = new ConcurrentHashMap<>();
+        private final Map<String, Rulebook> rules = new ConcurrentHashMap<>();
+        private final AtomicLong seq = new AtomicLong(1);
+
+        public String registerBot(BotProfile b) {
+            Objects.requireNonNull(b, "bot");
+            b = b.canonicalized();
+            require(b.botId().length() >= 10, "bot.bad_id", "botId too short");
+            require(!bots.containsKey(b.botId()), "bot.exists", "bot already exists");
