@@ -148,3 +148,53 @@ public final class sanic_moronian {
         private final Registry reg;
         private final ReceiptHasher hasher;
 
+        public RaceContract(Registry reg) {
+            this.reg = Objects.requireNonNull(reg, "registry");
+            this.hasher = new ReceiptHasher(CONTRACT_NAME, CONTRACT_SERIES, API_LEVEL, HEX_DOMAIN, HEX_NOISE);
+        }
+
+        public RaceReceipt runRace(RaceRequest req) {
+            Objects.requireNonNull(req, "req");
+            req = req.canonicalized();
+            Rulebook rules = reg.rulebook(req.ruleId());
+            TrackSpec track = reg.track(req.trackId());
+            List<BotProfile> bots = new ArrayList<>();
+            for (String id : req.botIds()) bots.add(reg.bot(id));
+
+            require(bots.size() >= 2 && bots.size() <= rules.limits().maxEntrants(), "race.bad_entrants", "entrants out of bounds");
+            require(track.laneCount() >= 2 && track.laneCount() <= 8, "track.bad_lanes", "laneCount out of bounds");
+            require(track.laneCount() >= bots.size(), "track.too_few_lanes", "not enough lanes for entrants");
+
+            long seed = SeedMixer.mix(req.seed(), HEX_BOOT, HEX_RULES, track.trackId(), rules.ruleId(), bots);
+            XorShift128Plus rng = new XorShift128Plus(seed);
+
+            CanonicalInput ci = CanonicalInput.of(req, rules, track, bots);
+            String inputHash = hasher.hashCanonical(ci.toBytes());
+
+            RaceEngine engine = new RaceEngine(rules, track, bots, rng, inputHash, hasher);
+            engine.initialize();
+            while (!engine.isFinished()) {
+                engine.step();
+            }
+            return engine.finish();
+        }
+    }
+
+    // ============================================================
+    // Data model (records are mainstream Java 17 style)
+    // ============================================================
+
+    public record BotProfile(
+            String botId,
+            String displayName,
+            String aiFamily,
+            int reaction,
+            int bravery,
+            int drift,
+            int greed,
+            String operatorAddress
+    ) {
+        public BotProfile {
+            botId = safeId(botId, "botId");
+            displayName = safeText(displayName, 1, 40, "displayName");
+            aiFamily = safeText(aiFamily, 1, 40, "aiFamily");
