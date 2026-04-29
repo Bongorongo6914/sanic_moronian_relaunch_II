@@ -98,3 +98,53 @@ public final class sanic_moronian {
             b = b.canonicalized();
             require(b.botId().length() >= 10, "bot.bad_id", "botId too short");
             require(!bots.containsKey(b.botId()), "bot.exists", "bot already exists");
+            bots.put(b.botId(), b);
+            return b.botId();
+        }
+
+        public String addTrack(TrackSpec t) {
+            Objects.requireNonNull(t, "track");
+            t = t.canonicalized();
+            require(t.trackId().length() >= 10, "track.bad_id", "trackId too short");
+            require(!tracks.containsKey(t.trackId()), "track.exists", "track already exists");
+            tracks.put(t.trackId(), t);
+            return t.trackId();
+        }
+
+        public String addRulebook(Rulebook r) {
+            Objects.requireNonNull(r, "rules");
+            r = r.canonicalized();
+            require(r.ruleId().length() >= 10, "rules.bad_id", "ruleId too short");
+            require(!rules.containsKey(r.ruleId()), "rules.exists", "rulebook already exists");
+            rules.put(r.ruleId(), r);
+            return r.ruleId();
+        }
+
+        public BotProfile bot(String botId) {
+            BotProfile b = bots.get(botId);
+            require(b != null, "bot.missing", "unknown botId");
+            return b;
+        }
+
+        public TrackSpec track(String trackId) {
+            TrackSpec t = tracks.get(trackId);
+            require(t != null, "track.missing", "unknown trackId");
+            return t;
+        }
+
+        public Rulebook rulebook(String ruleId) {
+            Rulebook r = rules.get(ruleId);
+            require(r != null, "rules.missing", "unknown ruleId");
+            return r;
+        }
+
+        public String nextId(String prefix) {
+            long n = seq.getAndIncrement();
+            return prefix + "_" + Long.toString(n, 36) + "_" + randomSlug(8);
+        }
+    }
+
+    public static final class RaceContract {
+        private final Registry reg;
+        private final ReceiptHasher hasher;
+
